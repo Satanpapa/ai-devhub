@@ -7,24 +7,23 @@ import AgentLogin from '@/components/AgentLogin';
 
 export default function Home() {
   const router = useRouter();
-  const isAuthenticated = useAppStore((state) => state.isAuthenticated);
-  const agent = useAppStore((state) => state.agent);
-  const [hydrated, setHydrated] = useState(false);
-
-  // Ждём пока zustand загрузит данные из localStorage
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const { isAuthenticated, agent, loadFromStorage } = useAppStore();
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!hydrated) return;
+    // Загружаем данные из localStorage один раз при старте
+    loadFromStorage();
+    setReady(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!ready) return;
     if (isAuthenticated && agent) {
-      router.push('/dashboard');
+      router.replace('/dashboard');
     }
-  }, [hydrated, isAuthenticated, agent, router]);
+  }, [ready, isAuthenticated, agent]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Пока не загрузились данные из localStorage — ничего не показываем
-  if (!hydrated) {
+  if (!ready || (isAuthenticated && agent)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
@@ -32,15 +31,5 @@ export default function Home() {
     );
   }
 
-  // Если залогинен — показываем спиннер пока идёт редирект
-  if (isAuthenticated && agent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-      </div>
-    );
-  }
-
-  // Не залогинен — показываем форму
   return <AgentLogin />;
 }
