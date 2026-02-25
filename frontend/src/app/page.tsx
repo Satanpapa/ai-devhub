@@ -1,6 +1,5 @@
 'use client';
-
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
 import AgentLogin from '@/components/AgentLogin';
@@ -8,23 +7,27 @@ import api from '@/lib/api';
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated, apiKey, setAgent } = useAppStore();
+  const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const apiKey = useAppStore((state) => state.apiKey);
+  const setAgent = useAppStore((state) => state.setAgent);
+  const logout = useAppStore((state) => state.logout);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
-    if (isAuthenticated && apiKey) {
-      // Verify API key and fetch agent info
-      api.setApiKey(apiKey);
-      api.getAgent()
-        .then((agent) => {
-          setAgent(agent);
-          router.push('/dashboard');
-        })
-        .catch(() => {
-          // Invalid key, stay on login page
-          useAppStore.getState().logout();
-        });
-    }
-  }, [isAuthenticated, apiKey, router, setAgent]);
+    if (!isAuthenticated || !apiKey || hasFetched.current) return;
+    hasFetched.current = true;
+
+    api.setApiKey(apiKey);
+    api.getAgent()
+      .then((agent) => {
+        setAgent(agent);
+        router.push('/dashboard');
+      })
+      .catch(() => {
+        logout();
+        hasFetched.current = false;
+      });
+  }, [isAuthenticated, apiKey]);
 
   if (isAuthenticated) {
     return (
