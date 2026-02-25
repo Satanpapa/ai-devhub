@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface Agent {
   id: string;
@@ -13,16 +13,11 @@ interface Agent {
 }
 
 interface AppState {
-  // Auth state
   apiKey: string | null;
   agent: Agent | null;
   isAuthenticated: boolean;
-  
-  // UI state
   sidebarOpen: boolean;
   currentView: 'dashboard' | 'repositories' | 'sandbox' | 'external' | 'settings';
-  
-  // Actions
   setApiKey: (key: string | null) => void;
   setAgent: (agent: Agent | null) => void;
   logout: () => void;
@@ -33,44 +28,40 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      // Initial state
       apiKey: null,
       agent: null,
       isAuthenticated: false,
       sidebarOpen: true,
       currentView: 'dashboard',
-      
-      // Actions
-      setApiKey: (key) => set({ 
-        apiKey: key, 
-        isAuthenticated: !!key 
-      }),
-      
+      setApiKey: (key) => set({ apiKey: key, isAuthenticated: !!key }),
       setAgent: (agent) => set({ agent }),
-      
-      logout: () => set({ 
-        apiKey: null, 
-        agent: null, 
-        isAuthenticated: false 
-      }),
-      
-      toggleSidebar: () => set((state) => ({ 
-        sidebarOpen: !state.sidebarOpen 
-      })),
-      
+      logout: () => set({ apiKey: null, agent: null, isAuthenticated: false }),
+      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setCurrentView: (view) => set({ currentView: view }),
     }),
     {
       name: 'ai-devhub-storage',
-      partialize: (state) => ({ 
+      storage: createJSONStorage(() => {
+        // Безопасная работа с localStorage — защита от SSR
+        if (typeof window === 'undefined') {
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          };
+        }
+        return localStorage;
+      }),
+      // Сохраняем и agent тоже — чтобы не было рассинхрона
+      partialize: (state) => ({
         apiKey: state.apiKey,
         isAuthenticated: state.isAuthenticated,
+        agent: state.agent,
       }),
     }
   )
 );
 
-// Repository store
 interface Repository {
   id: string;
   name: string;
@@ -99,19 +90,13 @@ export const useRepoStore = create<RepoState>((set) => ({
   repositories: [],
   selectedRepo: null,
   loading: false,
-  
   setRepositories: (repos) => set({ repositories: repos }),
   setSelectedRepo: (repo) => set({ selectedRepo: repo }),
-  addRepository: (repo) => set((state) => ({ 
-    repositories: [repo, ...state.repositories] 
-  })),
-  removeRepository: (id) => set((state) => ({ 
-    repositories: state.repositories.filter((r) => r.id !== id) 
-  })),
+  addRepository: (repo) => set((state) => ({ repositories: [repo, ...state.repositories] })),
+  removeRepository: (id) => set((state) => ({ repositories: state.repositories.filter((r) => r.id !== id) })),
   setLoading: (loading) => set({ loading }),
 }));
 
-// Execution store
 interface Execution {
   id: string;
   status: string;
@@ -141,19 +126,12 @@ export const useExecutionStore = create<ExecutionState>((set) => ({
   executions: [],
   currentExecution: null,
   loading: false,
-  
   setExecutions: (execs) => set({ executions: execs }),
   setCurrentExecution: (exec) => set({ currentExecution: exec }),
-  addExecution: (exec) => set((state) => ({ 
-    executions: [exec, ...state.executions] 
-  })),
+  addExecution: (exec) => set((state) => ({ executions: [exec, ...state.executions] })),
   updateExecution: (id, data) => set((state) => ({
-    executions: state.executions.map((e) => 
-      e.id === id ? { ...e, ...data } : e
-    ),
-    currentExecution: state.currentExecution?.id === id 
-      ? { ...state.currentExecution, ...data }
-      : state.currentExecution,
+    executions: state.executions.map((e) => e.id === id ? { ...e, ...data } : e),
+    currentExecution: state.currentExecution?.id === id ? { ...state.currentExecution, ...data } : state.currentExecution,
   })),
   setLoading: (loading) => set({ loading }),
 }));
