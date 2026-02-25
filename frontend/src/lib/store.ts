@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface Agent {
   id: string;
@@ -17,51 +16,66 @@ interface AppState {
   agent: Agent | null;
   isAuthenticated: boolean;
   sidebarOpen: boolean;
-  currentView: 'dashboard' | 'repositories' | 'sandbox' | 'external' | 'settings';
+  currentView: string;
   setApiKey: (key: string | null) => void;
   setAgent: (agent: Agent | null) => void;
   logout: () => void;
   toggleSidebar: () => void;
-  setCurrentView: (view: AppState['currentView']) => void;
+  setCurrentView: (view: string) => void;
+  loadFromStorage: () => void;
 }
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set) => ({
-      apiKey: null,
-      agent: null,
-      isAuthenticated: false,
-      sidebarOpen: true,
-      currentView: 'dashboard',
-      setApiKey: (key) => set({ apiKey: key, isAuthenticated: !!key }),
-      setAgent: (agent) => set({ agent }),
-      logout: () => set({ apiKey: null, agent: null, isAuthenticated: false }),
-      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-      setCurrentView: (view) => set({ currentView: view }),
-    }),
-    {
-      name: 'ai-devhub-storage',
-      storage: createJSONStorage(() => {
-        // Безопасная работа с localStorage — защита от SSR
-        if (typeof window === 'undefined') {
-          return {
-            getItem: () => null,
-            setItem: () => {},
-            removeItem: () => {},
-          };
-        }
-        return localStorage;
-      }),
-      // Сохраняем и agent тоже — чтобы не было рассинхрона
-      partialize: (state) => ({
-        apiKey: state.apiKey,
-        isAuthenticated: state.isAuthenticated,
-        agent: state.agent,
-      }),
-    }
-  )
-);
+export const useAppStore = create<AppState>((set) => ({
+  apiKey: null,
+  agent: null,
+  isAuthenticated: false,
+  sidebarOpen: true,
+  currentView: 'dashboard',
 
+  loadFromStorage: () => {
+    if (typeof window === 'undefined') return;
+    const key = localStorage.getItem('apiKey');
+    const agentStr = localStorage.getItem('agent');
+    if (key && agentStr) {
+      try {
+        const agent = JSON.parse(agentStr);
+        set({ apiKey: key, agent, isAuthenticated: true });
+      } catch {
+        localStorage.removeItem('apiKey');
+        localStorage.removeItem('agent');
+      }
+    }
+  },
+
+  setApiKey: (key) => {
+    if (typeof window !== 'undefined') {
+      if (key) localStorage.setItem('apiKey', key);
+      else localStorage.removeItem('apiKey');
+    }
+    set({ apiKey: key, isAuthenticated: !!key });
+  },
+
+  setAgent: (agent) => {
+    if (typeof window !== 'undefined') {
+      if (agent) localStorage.setItem('agent', JSON.stringify(agent));
+      else localStorage.removeItem('agent');
+    }
+    set({ agent });
+  },
+
+  logout: () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('apiKey');
+      localStorage.removeItem('agent');
+    }
+    set({ apiKey: null, agent: null, isAuthenticated: false });
+  },
+
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  setCurrentView: (view) => set({ currentView: view }),
+}));
+
+// Repository store
 interface Repository {
   id: string;
   name: string;
@@ -97,6 +111,7 @@ export const useRepoStore = create<RepoState>((set) => ({
   setLoading: (loading) => set({ loading }),
 }));
 
+// Execution store
 interface Execution {
   id: string;
   status: string;
