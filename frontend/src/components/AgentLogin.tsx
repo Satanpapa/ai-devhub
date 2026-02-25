@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bot, Key, Plus, Loader2 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import api from '@/lib/api';
@@ -14,7 +15,9 @@ export default function AgentLogin() {
   const [loading, setLoading] = useState(false);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
 
-  const { setApiKey: storeApiKey, setAgent } = useAppStore();
+  const router = useRouter();
+  const setApiKeyInStore = useAppStore((state) => state.setApiKey);
+  const setAgent = useAppStore((state) => state.setAgent);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,9 +27,11 @@ export default function AgentLogin() {
     try {
       api.setApiKey(apiKey);
       const agent = await api.getAgent();
-      storeApiKey(apiKey);
+      // Сначала агент, потом ключ — порядок важен
       setAgent(agent);
+      setApiKeyInStore(apiKey);
       toast.success(`Welcome, ${agent.name}!`);
+      router.push('/dashboard');
     } catch (error: any) {
       console.error('Login error:', error);
       toast.error(error.response?.data?.message || 'Invalid API key');
