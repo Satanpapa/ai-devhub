@@ -39,7 +39,7 @@ export default function Dashboard() {
   const [activity, setActivity] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+useEffect(() => {
     if (!isAuthenticated || !apiKey) {
       router.push('/');
       return;
@@ -68,7 +68,8 @@ export default function Dashboard() {
     };
 
     fetchData();
-  }, [isAuthenticated, apiKey, router, setRepositories, setExecutions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, apiKey]);
 
   if (loading) {
     return (
